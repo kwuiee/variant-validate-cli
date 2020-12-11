@@ -1,5 +1,7 @@
 # Variant Validate
 
+Validate a SNP/InDel from bam using CIGAR and MD tag.
+
 ## Tests
 
 Python result

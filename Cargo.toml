@@ -3,7 +3,7 @@ name = "vav"
 version = "0.1.0"
 authors = ["slyo <sean.lyo@outlook.com>"]
 edition = "2018"
-description = "SNP/InDel support summary from bam based on CIGAR and MD tag."
+description = "Validate a SNP/InDel from bam using CIGAR and MD tag."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
