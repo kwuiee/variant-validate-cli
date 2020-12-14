@@ -2,24 +2,32 @@
 
 Validate a SNP/InDel from bam using CIGAR and MD tag.
 
-## Tests
-
-Python result
+## Getting Started
 
 ```shell
-2020-12-11 17:27:59,634 __main__.py/569 WARNING: 2:29474101/C>A support stats: talt_depth 5, talt_frag 5, tall_depth 6247, nalt_depth 2, nall_depth 2017
+vav --help
+vav
+
+USAGE:
+    vav [FLAGS] [OPTIONS] --bam <bam> --var <var>
+
+FLAGS:
+    -h, --help       Prints help information
+    -v               Print verbose info.
+    -V, --version    Prints version information
+
+OPTIONS:
+        --bam <bam>          Input bam file.
+        --mapq <mapq>        Minimum read mapping quality. [default: 30]
+        --margin <margin>    Minimum margin base distance for alt support. Margin stands for read
+                             start/end, softclip start/end etc. [default: 10]
+        --var <var>          Input genome variant, e.g. 'chr1:12345AT>-'.
 ```
 
-Rust Result
+## Examples
 
-```javascript
-{
-  "reference": 7638,
-  "proper": 38,
-  "margin": 0,
-  "lowq": 0,
-  "excessive": 0,
-  "alleles": 48,
-  "unknown": 0
-}
+```shell
+vav \
+	--bam  tests/many_variants.bam \
+    --var "2:29474101C>A"
 ```
