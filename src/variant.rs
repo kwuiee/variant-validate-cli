@@ -1,13 +1,14 @@
 use std::fmt;
 
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::error::err;
 use crate::seq::{Base, Ordering};
 
-lazy_static! {
-    static ref VAREX: Regex = Regex::new(r"(?i)^(?P<chrom>(?:chr|)[\w\.-]+):(?P<pos>\d+)(?P<refs>(?:[ATCGN]+|-))>(?P<alts>(?:[ATCGN]+|-))$").unwrap();
-}
+static VAREX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)^(?P<chrom>(?:chr|)[\w\.-]+):(?P<pos>\d+)(?P<refs>(?:[ATCGN]+|-))>(?P<alts>(?:[ATCGN]+|-))$").unwrap()
+});
 
 #[derive(PartialEq, Debug)]
 pub struct Variant {

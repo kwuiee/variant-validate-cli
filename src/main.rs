@@ -21,9 +21,8 @@
 extern crate bam;
 extern crate clap;
 extern crate env_logger;
-#[macro_use]
-extern crate lazy_static;
 extern crate log;
+extern crate once_cell;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
@@ -36,6 +35,7 @@ use bam::record::AlignmentEntry;
 use bam::record::Record as BamRecord;
 use bam::IndexedReader as BamReader;
 use clap::Clap;
+use once_cell::sync::OnceCell;
 use serde::Serialize;
 
 mod error;
@@ -45,6 +45,9 @@ mod variant;
 use crate::error::err;
 use crate::seq::{Base, Ordering};
 use crate::variant::Variant;
+
+static MAPQ: OnceCell<u8> = OnceCell::new();
+static MARGIN: OnceCell<u32> = OnceCell::new();
 
 trait MakeRegion {
     fn make_region(&self, header: &BamHeader) -> Result<Region, Box<dyn Error>>;
@@ -99,6 +102,14 @@ impl Summary {
         self.proper as f32 / self.total_count() as f32
     }
 
+    fn margin_freq(&self) -> f32 {
+        self.margin as f32 / self.total_count() as f32
+    }
+
+    fn lowq_freq(&self) -> f32 {
+        self.lowq as f32 / self.total_count() as f32
+    }
+
     fn ref_count(&self) -> u32 {
         self.reference
     }
@@ -140,8 +151,14 @@ impl Summary {
         let mut rref: Vec<Base> = Vec::with_capacity(var.refs().len());
         // Record alt
         let mut ralt: Vec<Base> = Vec::with_capacity(var.alts().len());
+        // Front margin and end margin
+        let mut front = 0;
+        let mut end = 0;
         let mut iter = if let Ok(v) = record.alignment_entries() {
-            v.skip_while(|i| i.ref_pos() < Some(var.pos() - 1))
+            v.skip_while(|i| {
+                front += 1;
+                i.ref_pos() < Some(var.pos() - 1)
+            })
         } else {
             self.unknown += 1;
             return Ok(());
@@ -156,10 +173,13 @@ impl Summary {
 
         while let Some(curr) = next {
             next = iter.next();
+            if let Some(ref v) = curr.record_pos() {
+                end = *v;
+            };
 
             if preskip && var.is_abbr_deletion() {
                 preskip = false;
-                log::warn!("Skipping first base due to variant deletion format like `1:12345C>-`");
+                log::info!("Skipping first base due to variant deletion format like `1:12345C>-`");
                 continue;
             };
 
@@ -182,13 +202,14 @@ impl Summary {
                 break;
             }
         }
+        end = record.aligned_query_end() - end;
 
         match (var.ref_cmp(&rref), var.alt_cmp(&ralt), rref == ralt) {
             // Record ref does not accord with variant ref.
             (Ordering::Nul, _, _) => {
                 log::error!(
-                    "Bam record `{:?}` ref {:?} does not accord with variant ref {:?}.",
-                    String::from_utf8(record.name().to_vec()),
+                    "Bam record `{}` ref {:?} does not accord with variant ref {:?}.",
+                    String::from_utf8_lossy(&record.name().to_vec()),
                     rref,
                     var.refs()
                 );
@@ -197,41 +218,79 @@ impl Summary {
             }
             // Fully supported Alt
             (Ordering::Equ, Ordering::Equ, _) => {
-                self.proper += 1;
+                log::debug!(
+                    "Fully supported alt by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
+                if Some(&record.mapq()) < MAPQ.get() {
+                    self.lowq += 1;
+                } else if Some(&front) < MARGIN.get() || Some(&end) < MARGIN.get() {
+                    self.margin += 1;
+                } else {
+                    self.proper += 1;
+                }
                 Ok(())
             }
             // Fully supported Ref
             (Ordering::Equ, _, true) => {
+                log::debug!(
+                    "Fully supported ref by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.reference += 1;
                 Ok(())
             }
             // Excessively supported ref
             // FIXME: Extra base considered the same with genome reference
             (Ordering::Sub, _, true) => {
+                log::debug!(
+                    "Excessively supported ref by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.reference += 1;
                 Ok(())
             }
             // Partially supported Ref
             (_, _, true) => {
+                log::debug!(
+                    "Partially supported ref by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.reference += 1;
                 Ok(())
             }
             // Partially supported Alt
             (Ordering::Sub, Ordering::Equ, false) => {
+                log::debug!(
+                    "Partially supported alt by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.excessive += 1;
                 Ok(())
             }
             // Excessively supported Alt
             (_, Ordering::Sub, false) => {
+                log::debug!(
+                    "Excessively supported alt by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.excessive += 1;
                 Ok(())
             }
             // Partially supported Alt
             (_, Ordering::Sup, false) => {
+                log::debug!(
+                    "Partially supported alt (interpreted as other allele) by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.alleles += 1;
                 Ok(())
             }
             _ => {
+                log::debug!(
+                    "Other allele by record `{}`",
+                    String::from_utf8_lossy(&record.name().to_vec())
+                );
                 self.alleles += 1;
                 Ok(())
             }
@@ -245,7 +304,7 @@ struct Opts {
     bam: String,
     #[clap(long, about = "Input genome variant, e.g. 'chr1:12345AT>-'.")]
     var: String,
-    #[clap(long, default_value = "0", about = "Minimum read mapping quality.")]
+    #[clap(long, default_value = "30", about = "Minimum read mapping quality.")]
     mapq: u8,
     #[clap(
         long,
@@ -253,13 +312,21 @@ struct Opts {
         about = "Minimum margin base distance for alt support. Margin stands for read start/end, softclip start/end etc."
     )]
     margin: u32,
+    #[clap(short, about = "Print verbose info.")]
+    verbose: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::parse();
+    MAPQ.set(opts.mapq).map_err(|_| err())?;
+    MARGIN.set(opts.margin).map_err(|_| err())?;
 
     env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(if opts.verbose {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Info
+        })
         .init();
 
     log::warn!("Reading bam file {}.", &opts.bam);
@@ -269,7 +336,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut sum = Summary::default();
     let var = Variant::try_parse(&opts.var)?;
-    log::warn!("Parsing variant as {:?}", var);
+    log::warn!("Parsed variant as {:?}", var);
 
     log::warn!("Fetching variant adjcent reads.");
     let reg = var.make_region(sam.header())?;
@@ -288,6 +355,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    log::warn!(
+        "Total {}; Ref {}({}); Proper alt {}({}); Margin alt {}({}); Lowq alt {}({})",
+        sum.total_count(),
+        sum.reference,
+        sum.ref_freq(),
+        sum.proper,
+        sum.proper_freq(),
+        sum.margin,
+        sum.margin_freq(),
+        sum.lowq,
+        sum.lowq_freq(),
+    );
     println!("{}", serde_json::to_string_pretty(&sum)?);
     Ok(())
 }
