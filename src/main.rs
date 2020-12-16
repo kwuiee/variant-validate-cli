@@ -97,19 +97,23 @@ impl Summary {
     }
 
     fn alt_freq(&self) -> f32 {
-        self.alt_count() as f32 / self.total_count() as f32
+        let v = self.alt_count() as f32 / self.total_count() as f32;
+        (v * 10000.0).round() / 10000.0
     }
 
     fn proper_freq(&self) -> f32 {
-        self.proper as f32 / self.total_count() as f32
+        let v = self.proper as f32 / self.total_count() as f32;
+        (v * 10000.0).round() / 10000.0
     }
 
     fn margin_freq(&self) -> f32 {
-        self.margin as f32 / self.total_count() as f32
+        let v = self.margin as f32 / self.total_count() as f32;
+        (v * 10000.0).round() / 10000.0
     }
 
     fn lowq_freq(&self) -> f32 {
-        self.lowq as f32 / self.total_count() as f32
+        let v = self.lowq as f32 / self.total_count() as f32;
+        (v * 10000.0).round() / 10000.0
     }
 
     fn ref_count(&self) -> u32 {
@@ -117,7 +121,8 @@ impl Summary {
     }
 
     fn ref_freq(&self) -> f32 {
-        self.ref_count() as f32 / self.total_count() as f32
+        let v = self.ref_count() as f32 / self.total_count() as f32;
+        (v * 10000.0).round() / 10000.0
     }
 
     /// Validate record supportion for variant.

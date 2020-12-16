@@ -256,7 +256,7 @@ pub enum Ordering {
 }
 
 #[cfg(test)]
-mod Test {
+mod test {
     use super::*;
 
     #[test]
