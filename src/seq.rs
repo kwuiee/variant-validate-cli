@@ -55,7 +55,9 @@ impl<'a> Base {
                         b'C' | b'c' => Base::C,
                         b'G' | b'g' => Base::G,
                         b'N' | b'n' => Base::N,
-                        _ => return Err(err()),
+                        _ => {
+                            return Err(err(&format!("Error parsing `{}` as as Base sequence.", v)))
+                        }
                     });
                     Ok(())
                 })?;
@@ -81,7 +83,7 @@ impl<'a> Base {
             b'C' | b'c' => Ok(Base::C),
             b'G' | b'g' => Ok(Base::G),
             b'N' | b'n' => Ok(Base::N),
-            _ => Err(err()),
+            _ => Err(err(&format!("Error parsing `{}` as valid Base", v))),
         }
     }
 }

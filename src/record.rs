@@ -3,7 +3,7 @@ use std::error::Error;
 use bam::record::AlignmentEntry;
 use bam::record::Record as BamRecord;
 
-use crate::error::err;
+use crate::error::opterr;
 use crate::seq::{Base, Ordering, Support};
 use crate::variant::Variant;
 
@@ -73,12 +73,12 @@ impl VariantValidate for BamRecord {
             };
 
             if curr.is_insertion() {
-                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(err)?)?)
+                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(opterr)?)?)
             } else if curr.is_deletion() {
-                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(err)?)?)
+                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(opterr)?)?)
             } else {
-                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(err)?)?);
-                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(err)?)?)
+                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(opterr)?)?);
+                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(opterr)?)?)
             };
 
             match next {

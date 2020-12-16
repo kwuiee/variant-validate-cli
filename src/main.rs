@@ -42,7 +42,7 @@ mod error;
 mod seq;
 mod variant;
 
-use crate::error::err;
+use crate::error::opterr;
 use crate::seq::{Base, Ordering};
 use crate::variant::Variant;
 
@@ -55,7 +55,7 @@ trait MakeRegion {
 
 impl MakeRegion for Variant {
     fn make_region(&self, header: &BamHeader) -> Result<Region, Box<dyn Error>> {
-        let rid = header.reference_id(self.chrom()).ok_or_else(err)?;
+        let rid = header.reference_id(self.chrom()).ok_or_else(opterr)?;
         Ok(Region::new(rid, self.pos(), self.end()))
     }
 }
@@ -184,12 +184,12 @@ impl Summary {
             };
 
             if curr.is_insertion() {
-                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(err)?)?)
+                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(opterr)?)?)
             } else if curr.is_deletion() {
-                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(err)?)?)
+                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(opterr)?)?)
             } else {
-                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(err)?)?);
-                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(err)?)?)
+                ralt.push(Base::from_byte(curr.record_nt().ok_or_else(opterr)?)?);
+                rref.push(Base::from_byte(curr.ref_nt().ok_or_else(opterr)?)?)
             };
 
             if let Some(ref v) = next {
@@ -300,7 +300,7 @@ impl Summary {
 
 #[derive(Clap)]
 struct Opts {
-    #[clap(long, about = "Input bam file.")]
+    #[clap(about = "Input bam file.")]
     bam: String,
     #[clap(long, about = "Input genome variant, e.g. 'chr1:12345AT>-'.")]
     var: String,
@@ -318,8 +318,8 @@ struct Opts {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::parse();
-    MAPQ.set(opts.mapq).map_err(|_| err())?;
-    MARGIN.set(opts.margin).map_err(|_| err())?;
+    MAPQ.set(opts.mapq).map_err(|_| opterr())?;
+    MARGIN.set(opts.margin).map_err(|_| opterr())?;
 
     env_logger::Builder::new()
         .filter_level(if opts.verbose {

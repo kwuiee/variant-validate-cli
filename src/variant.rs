@@ -3,7 +3,7 @@ use std::fmt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::error::err;
+use crate::error::{err, opterr};
 use crate::seq::{Base, Ordering};
 
 static VAREX: Lazy<Regex> = Lazy::new(|| {
@@ -33,13 +33,16 @@ impl Variant {
     pub fn try_parse(v: &str) -> Result<Self, Box<dyn std::error::Error>> {
         if let Some(c) = VAREX.captures(v) {
             Ok(Self {
-                chrom: String::from(c.name("chrom").ok_or_else(err)?.as_str()),
-                pos: c.name("pos").ok_or_else(err)?.as_str().parse()?,
-                refs: Base::try_parse(c.name("refs").ok_or_else(err)?.as_str())?,
-                alts: Base::try_parse(c.name("alts").ok_or_else(err)?.as_str())?,
+                chrom: String::from(c.name("chrom").ok_or_else(opterr)?.as_str()),
+                pos: c.name("pos").ok_or_else(opterr)?.as_str().parse()?,
+                refs: Base::try_parse(c.name("refs").ok_or_else(opterr)?.as_str())?,
+                alts: Base::try_parse(c.name("alts").ok_or_else(opterr)?.as_str())?,
             })
         } else {
-            Err(Box::new(err()))
+            Err(Box::new(err(&format!(
+                "Error parsing `{}` as a Variant",
+                v
+            ))))
         }
     }
 
