@@ -387,6 +387,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         varsum.insert(each, sum);
     }
-    println!("{}", serde_json::to_string_pretty(&varsum)?);
+
+    if varsum.len() == 1usize {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&varsum.values().next().ok_or_else(opterr)?)?
+        );
+    } else {
+        println!("{}", serde_json::to_string_pretty(&varsum)?);
+    }
     Ok(())
 }
