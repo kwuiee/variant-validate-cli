@@ -1,6 +1,6 @@
 [package]
 name = "vav"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["slyo <sean.lyo@outlook.com>"]
 edition = "2018"
 description = "Validate a SNP/InDel from bam using CIGAR and MD tag."

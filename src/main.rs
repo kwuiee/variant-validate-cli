@@ -19,6 +19,7 @@
 //!     --var "2:29474101C>A"
 //! ```
 extern crate bam;
+#[macro_use]
 extern crate clap;
 extern crate env_logger;
 extern crate log;
@@ -27,6 +28,7 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 
+use std::collections::HashMap;
 use std::error::Error;
 
 use bam::bam_reader::{ModificationTime, Region};
@@ -299,11 +301,14 @@ impl Summary {
 }
 
 #[derive(Clap)]
+#[clap(name = crate_name!(), version = crate_version!(), author = crate_authors!(), about = crate_description!())]
 struct Opts {
-    #[clap(about = "Input bam file.")]
-    bam: String,
-    #[clap(long, about = "Input genome variant, e.g. 'chr1:12345AT>-'.")]
-    var: String,
+    #[clap(
+        long,
+        number_of_values = 1,
+        about = "Input genome variant, e.g. 'chr1:12345AT>-'."
+    )]
+    var: Vec<String>,
     #[clap(long, default_value = "30", about = "Minimum read mapping quality.")]
     mapq: u8,
     #[clap(
@@ -312,12 +317,14 @@ struct Opts {
         about = "Minimum margin base distance for alt support. Margin stands for read start/end, softclip start/end etc."
     )]
     margin: u32,
-    #[clap(short, about = "Print verbose info.")]
+    #[clap(short, long, about = "Print verbose info.")]
     verbose: bool,
+    #[clap(about = "Input bam file.")]
+    bam: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let opts = Opts::parse();
+    let mut opts = Opts::parse();
     MAPQ.set(opts.mapq).map_err(|_| opterr())?;
     MARGIN.set(opts.margin).map_err(|_| opterr())?;
 
@@ -334,39 +341,47 @@ fn main() -> Result<(), Box<dyn Error>> {
         .modification_time(ModificationTime::warn(|e| eprintln!("{}", e)))
         .from_path(&opts.bam)?;
 
-    let mut sum = Summary::default();
-    let var = Variant::try_parse(&opts.var)?;
-    log::warn!("Parsed variant as {:?}", var);
-
-    log::warn!("Fetching variant adjcent reads.");
-    let reg = var.make_region(sam.header())?;
-    for i in sam.fetch(&reg)? {
-        let record = i?;
-        if ((record.start() + 1) as u32 > var.pos())
-            || ((record.calculate_end() as u32) < var.end())
-        {
-            break;
+    let mut varsum: HashMap<String, Summary> = HashMap::new();
+    while let Some(each) = opts.var.pop() {
+        if varsum.contains_key(&each) {
+            continue;
         };
-        match sum.validate(&record, &var) {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("{}", e)
+        let variant = Variant::try_parse(&each)?;
+        let mut sum = Summary::default();
+        log::warn!("Variant {} Parsed as {:?}", &each, variant);
+
+        log::warn!("Fetching variant adjcent reads.");
+        let reg = variant.make_region(sam.header())?;
+        for i in sam.fetch(&reg)? {
+            let record = i?;
+            if ((record.start() + 1) as u32 > variant.pos())
+                || ((record.calculate_end() as u32) < variant.end())
+            {
+                break;
+            };
+            match sum.validate(&record, &variant) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("{}", e)
+                }
             }
         }
-    }
 
-    log::warn!(
-        "Total {}; Ref {}({}); Proper alt {}({}); Margin alt {}({}); Lowq alt {}({})",
-        sum.total_count(),
-        sum.reference,
-        sum.ref_freq(),
-        sum.proper,
-        sum.proper_freq(),
-        sum.margin,
-        sum.margin_freq(),
-        sum.lowq,
-        sum.lowq_freq(),
-    );
-    println!("{}", serde_json::to_string_pretty(&sum)?);
+        log::warn!(
+            "Variant {} total {}; Ref {}({}); Proper alt {}({}); Margin alt {}({}); Lowq alt {}({})",
+            &each,
+            sum.total_count(),
+            sum.reference,
+            sum.ref_freq(),
+            sum.proper,
+            sum.proper_freq(),
+            sum.margin,
+            sum.margin_freq(),
+            sum.lowq,
+            sum.lowq_freq(),
+        );
+        varsum.insert(each, sum);
+    }
+    println!("{}", serde_json::to_string_pretty(&varsum)?);
     Ok(())
 }
