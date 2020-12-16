@@ -5,29 +5,31 @@ Validate a SNP/InDel from bam using CIGAR and MD tag.
 ## Getting Started
 
 ```shell
-vav --help
-vav
+$ vav --help
+vav 0.1.1
+slyo <sean.lyo@outlook.com>
+Validate a SNP/InDel from bam using CIGAR and MD tag.
 
 USAGE:
-    vav [FLAGS] [OPTIONS] --bam <bam> --var <var>
+    vav [FLAGS] [OPTIONS] <bam>
+
+ARGS:
+    <bam>    Input bam file.
 
 FLAGS:
     -h, --help       Prints help information
-    -v               Print verbose info.
+    -v, --verbose    Print verbose info.
     -V, --version    Prints version information
 
 OPTIONS:
-        --bam <bam>          Input bam file.
         --mapq <mapq>        Minimum read mapping quality. [default: 30]
         --margin <margin>    Minimum margin base distance for alt support. Margin stands for read
                              start/end, softclip start/end etc. [default: 10]
-        --var <var>          Input genome variant, e.g. 'chr1:12345AT>-'.
+        --var <var>...       Input genome variant, e.g. 'chr1:12345AT>-'.
 ```
 
 ## Examples
 
 ```shell
-vav \
-	--bam  tests/many_variants.bam \
-    --var "2:29474101C>A"
+$ vav tests/many_variants.bam --var '1:156843458A>G' --var "2:29474101C>A"
 ```
